@@ -1,3 +1,6 @@
+# Credit to user Berardinux for instructions to get this started
+Berardinux Blackbriar repo here: https://github.com/Berardinux/Blackbriar/blob/main/src/dcMotorxbox.py
+
 # Connect Xbox Controller to bluetooth
 bluetoothctl
 
