@@ -1,0 +1,283 @@
+# Imports
+import RPi.GPIO as GPIO
+import time
+import evdev
+import threading
+
+# GPIO Mode (Board refers to the pins as they are numbered 1-40)
+GPIO.setmode(GPIO.BOARD)
+
+
+# Variables
+# Pin Variables
+servo_1_pin = 11
+servo_2_pin = 13
+servo_3_pin = 15
+# Delay Variable
+delay = 0.005
+# Last Servo Angle Variables
+last_servo_1 = 90
+last_servo_2 = 90
+last_servo_3 = 90
+# Servo Angle Step Size
+step = 1
+
+
+# Servo Setup
+# Servo 1
+GPIO.setup(servo_1_pin,GPIO.OUT)
+servo_1 = GPIO.PWM(servo_1_pin,50)
+servo_1.start(0)
+
+servo_1_thread = None
+servo_1_running = False
+servo_1_direction = 0  # -1 = 0, 1 = 180, 0 = stop
+
+
+# Servo 2
+GPIO.setup(servo_2_pin,GPIO.OUT)
+servo_2 = GPIO.PWM(servo_2_pin,50)
+servo_2.start(0)
+
+servo_2_thread = None
+servo_2_running = False
+servo_2_direction = 0 
+
+
+# Servo 3
+GPIO.setup(servo_3_pin,GPIO.OUT)
+servo_3 = GPIO.PWM(servo_3_pin,50)
+servo_3.start(0)
+
+servo_3_thread = None
+servo_3_running = False
+servo_3_direction = 0
+
+
+# Motor Control Methods
+# 0° rotation is 2.5% duty cycle
+# 90° rotation is 7.5% duty cycle
+# 180° rotation is 12.5% duty cycle
+
+# Servo 1
+# Rotate to target angle
+def servo_1_rotation(target_angle):
+    global last_servo_1
+    print(f"Servo 1 rotating to {target_angle}°")
+    step = 1 if target_angle > last_servo_1 else -1
+    for angle in range(last_servo_1, target_angle + step, step):
+        duty_cycle = 2.5 + (angle / 180.0) * 10
+        servo_1.ChangeDutyCycle(duty_cycle)
+        time.sleep(delay)
+    last_servo_1 = target_angle
+
+# Rotate continuously
+def servo_1_continuous_move():
+    global last_servo_1, servo_1_running, servo_1_direction
+    while servo_1_running:
+        if servo_1_direction == 1 and last_servo_1 < 180:
+            last_servo_1 += step
+        elif servo_1_direction == -1 and last_servo_1 > 0:
+            last_servo_1 -= step
+        else:
+            # Stops when at extremes (180 or 0 degrees)
+            break 
+
+        duty_cycle = 2.5 + (last_servo_1 / 180.0) * 10
+        servo_1.ChangeDutyCycle(duty_cycle)
+        time.sleep(delay)
+    # Change duty cycle to 0 to prevent jitters
+    # May need to remove if this causes servo to go slack
+    servo_1.ChangeDutyCycle(0)  
+
+
+# Servo 2
+# Rotate to target angle
+def servo_2_rotation(target_angle):
+    global last_servo_2
+    print(f"Servo 2 rotating to {target_angle}°")
+    step = 1 if target_angle > last_servo_2 else -1
+    for angle in range(last_servo_2, target_angle + step, step):
+        duty_cycle = 2.5 + (angle / 180.0) * 10
+        servo_2.ChangeDutyCycle(duty_cycle)
+        time.sleep(delay)
+    last_servo_2 = target_angle
+
+# Rotate continously
+def servo_2_continuous_move():
+    global last_servo_2, servo_2_running, servo_2_direction
+    while servo_2_running:
+        if servo_2_direction == 1 and last_servo_2 < 180:
+            last_servo_2 += step
+        elif servo_2_direction == -1 and last_servo_2 > 0:
+            last_servo_2 -= step
+        else:
+            break
+
+        duty_cycle = 2.5 + (last_servo_2 / 180.0) * 10
+        servo_2.ChangeDutyCycle(duty_cycle)
+        time.sleep(delay)
+    servo_2.ChangeDutyCycle(0) 
+
+# Servo 3
+# Rotate to target angle
+def servo_3_rotation(target_angle):
+    global last_servo_3
+    print(f"Servo 3 rotating to {target_angle}°")
+    step = 1 if target_angle > last_servo_3 else -1
+    for angle in range(last_servo_3, target_angle + step, step):
+        duty_cycle = 2.5 + (angle / 180.0) * 10
+        servo_3.ChangeDutyCycle(duty_cycle)
+        time.sleep(delay)
+    last_servo_3 = target_angle
+
+# Rotate continously
+def servo_3_continuous_move():
+    global last_servo_3, servo_3_running, servo_3_direction
+    while servo_3_running:
+        if servo_3_direction == 1 and last_servo_3 < 180:
+            last_servo_3 += step
+        elif servo_3_direction == -1 and last_servo_3 > 0:
+            last_servo_3 -= step
+        else:
+            break
+
+        duty_cycle = 2.5 + (last_servo_3 / 180.0) * 10
+        servo_3.ChangeDutyCycle(duty_cycle)
+        time.sleep(delay)
+    servo_3.ChangeDutyCycle(0) 
+
+# Controller Event Number
+device = evdev.InputDevice('/dev/input/event9')
+print(device)
+
+try:
+    # Set all servos to default angle of 90
+    time.sleep(0.5)
+    servo_1_rotation(90)
+    time.sleep(0.5)
+    servo_1.ChangeDutyCycle(0)
+
+    time.sleep(0.5)
+    servo_2_rotation(90)
+    time.sleep(0.5)
+    servo_2.ChangeDutyCycle(0)
+
+    time.sleep(0.5)
+    servo_3_rotation(90)
+    time.sleep(0.5)
+    servo_3.ChangeDutyCycle(0)
+
+    time.sleep(0.5)
+
+    for event in device.read_loop():
+        if event.type == evdev.ecodes.EV_ABS:
+
+            # Left Joystick (Servo 1)
+            if event.code == evdev.ecodes.ABS_Y:
+                # Rotate incrementally to 180 degrees
+                if event.value <= 31100: 
+                    if not servo_1_running or servo_1_direction != 1:
+                        print(f"Left Joystick Up: {event.value}")
+                        servo_1_running = True
+                        servo_1_direction = -1
+                        if servo_1_thread is None or not servo_1_thread.is_alive():
+                            servo_1_thread = threading.Thread(target=servo_1_continuous_move)
+                            servo_1_thread.start()
+                # Rotate incrementally to 0 degrees
+                elif event.value >= 43100: 
+                    if not servo_1_running or servo_1_direction != -1:
+                        print(f"Left Joystick Down: {event.value}")
+                        servo_1_running = True
+                        servo_1_direction = 1
+                        if servo_1_thread is None or not servo_1_thread.is_alive():
+                            servo_1_thread = threading.Thread(target=servo_1_continuous_move)
+                            servo_1_thread.start()
+                # Joystick neutral zone
+                else:
+                    if servo_1_running:
+                        print(f"Left Joystick in Neutral Zone: {event.value}")
+                        servo_1_running = False
+                        servo_1_direction = 0
+
+
+            # Right Joystick (Servo 2)
+            if event.code == evdev.ecodes.ABS_RZ:
+                # Rotate incrementally to 180 degrees
+                if event.value <= 32000: 
+                    if not servo_2_running or servo_2_direction != 1:
+                        print(f"Right Joystick Up: {event.value}")
+                        servo_2_running = True
+                        servo_2_direction = -1
+                        if servo_2_thread is None or not servo_2_thread.is_alive():
+                            servo_2_thread = threading.Thread(target=servo_2_continuous_move)
+                            servo_2_thread.start()
+                # Rotate incrementally to 0 degrees
+                elif event.value >= 34600:
+                    if not servo_2_running or servo_2_direction != -1:
+                        print(f"Right Joystick Down: {event.value}")
+                        servo_2_running = True
+                        servo_2_direction = 1
+                        if servo_2_thread is None or not servo_2_thread.is_alive():
+                            servo_2_thread = threading.Thread(target=servo_2_continuous_move)
+                            servo_2_thread.start()
+                # Joystick neutral zone
+                else:
+                    if servo_2_running:
+                        print(f"Right Joystick in Neutral Zone: {event.value}")
+                        servo_2_running = False
+                        servo_2_direction = 0
+
+           
+            # Triggers (Servo 3)
+            # Right Trigger (Grab)
+            if event.code == evdev.ecodes.ABS_GAS:
+                # Check for fully pressed trigger
+                if event.value == 1023:  
+                    if not servo_3_running or servo_3_direction != 1:
+                        print("Grabbing...")
+                        servo_3_running = True
+                        servo_3_direction = -1
+                        if servo_3_thread is None or not servo_3_thread.is_alive():
+                            servo_3_thread = threading.Thread(target=servo_3_continuous_move)
+                            servo_3_thread.start()
+                else:
+                    if servo_3_running and servo_3_direction == 1:
+                        print("Grab released")
+                        servo_3_running = False
+                        servo_3_direction = 0
+
+            # Left Trigger (Release)
+            if event.code == evdev.ecodes.ABS_BRAKE:
+                # Check for fully pressed trigger
+                if event.value == 1023:
+                    if not servo_3_running or servo_3_direction != -1:
+                        print("Releasing...")
+                        servo_3_running = True
+                        servo_3_direction = 1
+                        if servo_3_thread is None or not servo_3_thread.is_alive():
+                            servo_3_thread = threading.Thread(target=servo_3_continuous_move)
+                            servo_3_thread.start()
+                else:
+                    if servo_3_running and servo_3_direction == -1:
+                        print("Release stopped")
+                        servo_3_running = False
+                        servo_3_direction = 0
+
+# Ctrl + C to End Program and Clean GPIO
+except KeyboardInterrupt:
+    print("\nProgram interrupted! Cleaning up GPIO and exiting...")
+    pass
+finally:
+    servo_1_running = False
+    servo_2_running = False
+    servo_3_running = False
+
+    servo_1.stop()
+    servo_2.stop()
+    servo_3.stop()
+
+    GPIO.cleanup()
+
+
+# To Do --------------------------------------
